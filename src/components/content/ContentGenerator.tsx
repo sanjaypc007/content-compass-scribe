@@ -1,31 +1,45 @@
-
 import React, { useState } from "react";
 import { v4 as uuidv4 } from 'uuid';
-import { format } from "date-fns";
-import { useContentStore, Platform, ContentItem, CalendarItem } from "@/hooks/useContentStore";
+import { useContentStore, Platform, ContentItem } from "@/hooks/useContentStore";
 import { useToast } from "@/hooks/use-toast";
 import { PlatformSection } from "./generator/PlatformSection";
-import { TopicInput } from "./generator/TopicInput";
 import { ContentEditor } from "./generator/ContentEditor";
-import { ContentCalendar } from "./generator/ContentCalendar";
 import { generateAIContent, fetchFromWebhook } from "./generator/contentService";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Loader2 } from "lucide-react";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
+import { 
+  Card, 
+  CardContent, 
+  CardDescription, 
+  CardFooter, 
+  CardHeader, 
+  CardTitle 
+} from "@/components/ui/card";
+import { PlatformIcon, formatContent, getFirstLine } from "@/lib/formatUtils";
+import { Link } from "react-router-dom";
 
 export function ContentGenerator() {
   const [platform, setPlatform] = useState<Platform | null>(null);
   const [topic, setTopic] = useState<string>("");
-  const [generatedContent, setGeneratedContent] = useState<string>("");
+  const [content, setContent] = useState<string>("");
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
-  const [isCalendarOpen, setIsCalendarOpen] = useState<boolean>(true);
   const [useWebhook, setUseWebhook] = useState<boolean>(true);
   const [webhookResponse, setWebhookResponse] = useState<any>(null);
   
   const { toast } = useToast();
-  const addToHistory = useContentStore(state => state.addToHistory);
-  const addToCalendar = useContentStore(state => state.addToCalendar);
-  const calendarItems = useContentStore(state => state.calendarItems);
+  const { contentHistory, addToHistory } = useContentStore(state => ({ 
+    contentHistory: state.contentHistory,
+    addToHistory: state.addToHistory 
+  }));
+
+  const recentHistory = [...contentHistory]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 3);
   
-  const handleGenerate = async () => {
+  const handleGenerateContent = async () => {
     if (!platform) {
       toast({
         title: "Platform Required",
@@ -38,145 +52,161 @@ export function ContentGenerator() {
     if (!topic.trim()) {
       toast({
         title: "Topic Required",
-        description: "Please provide a topic for your content.",
+        description: "Please enter a topic to generate content.",
         variant: "destructive",
       });
       return;
     }
     
+    setIsGenerating(true);
+    setContent("");
+    setWebhookResponse(null);
+
     try {
-      setIsGenerating(true);
-      let content = "";
+      let generatedContent: string | object = "";
+      let rawResponse: any = null;
       
       if (useWebhook) {
-        // Use webhook for content generation
-        const data = await fetchFromWebhook(platform, topic);
-        setWebhookResponse(data);
-        
-        // Extract content from webhook response
-        content = data.content || data.message || 
-                 (typeof data === 'string' ? data : JSON.stringify(data));
+        rawResponse = await fetchFromWebhook(platform, topic);
+        setWebhookResponse(rawResponse); 
+        generatedContent = rawResponse;
       } else {
-        // Use simulated content generation
-        content = await generateAIContent(platform, topic);
+        const aiContent = await generateAIContent(platform, topic);
+        setContent(aiContent);
+        generatedContent = aiContent;
       }
       
-      setGeneratedContent(content);
-      
-      // Add to history
       const contentItem: ContentItem = {
         id: uuidv4(),
         platform,
         topic,
-        content,
+        content: generatedContent,
         createdAt: new Date().toISOString(),
       };
       
       addToHistory(contentItem);
       
       toast({
-        title: "Content Created",
+        title: "Content Generated",
         description: useWebhook ? "Content received from webhook" : "Your content has been successfully generated.",
       });
-      
-      // Auto-open calendar if not already open
-      if (!isCalendarOpen) {
-        setIsCalendarOpen(true);
-      }
     } catch (error) {
       console.error("Error generating content:", error);
       toast({
         title: "Generation Failed",
-        description: `There was an error: ${error instanceof Error ? error.message : "Unknown error"}`,
+        description: `Failed to generate content. ${error instanceof Error ? error.message : 'Please try again.'}`,
         variant: "destructive",
       });
+      setContent(""); 
+      setWebhookResponse(null);
     } finally {
       setIsGenerating(false);
     }
   };
-  
-  const handleSchedule = () => {
-    if (selectedDate) {
-      const calendarItem: CalendarItem = {
-        id: uuidv4(),
-        platform: platform!,
-        topic,
-        content: generatedContent,
-        createdAt: new Date().toISOString(),
-        scheduledDate: selectedDate.toISOString(),
-      };
-      
-      addToCalendar(calendarItem);
-      toast({
-        title: "Added to Calendar",
-        description: `Content scheduled for ${format(selectedDate, "PPP")}`,
-      });
-    } else {
-      toast({
-        title: "Date Required",
-        description: "Please select a date for scheduling.",
-        variant: "destructive",
-      });
-    }
-  };
 
-  // Get scheduled items for the selected date
-  const getScheduledItemsForSelectedDate = () => {
-    if (!selectedDate) return [];
-    
-    const startOfDay = new Date(selectedDate);
-    startOfDay.setHours(0, 0, 0, 0);
-    
-    const endOfDay = new Date(selectedDate);
-    endOfDay.setHours(23, 59, 59, 999);
-    
-    return calendarItems.filter(item => {
-      const itemDate = new Date(item.scheduledDate);
-      return itemDate >= startOfDay && itemDate <= endOfDay;
+  const handleDelete = () => {
+    setContent("");
+    setWebhookResponse(null);
+    toast({
+      title: "Content Cleared",
+      description: "The current generated content has been cleared.",
     });
   };
-  
-  const scheduledItems = getScheduledItemsForSelectedDate();
 
   return (
-    <div className="space-y-8 animate-fade-in">
-      <PlatformSection 
-        platform={platform}
-        setPlatform={setPlatform}
-        useWebhook={useWebhook}
-        setUseWebhook={setUseWebhook}
-      />
-      
-      <TopicInput
-        topic={topic}
-        setTopic={setTopic}
-        handleGenerate={handleGenerate}
-        isGenerating={isGenerating}
-        platform={platform}
-        useWebhook={useWebhook}
-      />
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="space-y-4">
-          {generatedContent && (
-            <ContentEditor
-              content={generatedContent}
-              setContent={setGeneratedContent}
-              webhookResponse={webhookResponse}
-              useWebhook={useWebhook}
+    <div className="space-y-8 p-4 max-w-4xl mx-auto">
+      <div className="space-y-4 bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+        <h2 className="text-xl font-semibold mb-4">Generate New Content</h2>
+        <PlatformSection 
+          platform={platform}
+          setPlatform={setPlatform}
+          useWebhook={useWebhook}
+          setUseWebhook={setUseWebhook}
+        />
+        
+        <div className="space-y-2">
+          <label htmlFor="topic" className="text-sm font-medium">
+            Topic
+          </label>
+          <div className="flex space-x-2">
+            <Input
+              id="topic"
+              placeholder="Enter your topic (e.g., AI Agents, Remote Work, Cloud Migration)"
+              value={topic}
+              onChange={(e) => setTopic(e.target.value)}
+              className="flex-1"
             />
-          )}
+            <Button
+              onClick={handleGenerateContent}
+              disabled={isGenerating}
+              className="min-w-[140px] bg-blue-600 hover:bg-blue-700"
+            >
+              {isGenerating ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                "Generate Content"
+              )}
+            </Button>
+          </div>
         </div>
         
-        <div className="space-y-4">
-          <ContentCalendar
-            selectedDate={selectedDate}
-            setSelectedDate={setSelectedDate}
-            handleSchedule={handleSchedule}
-            scheduledItems={scheduledItems}
-          />
-        </div>
+        {(content || webhookResponse) && (
+          <div className="mt-4">
+            <ContentEditor
+              content={content}
+              setContent={setContent}
+              webhookResponse={webhookResponse}
+              useWebhook={useWebhook}
+              onDelete={handleDelete}
+            />
+          </div>
+        )}
       </div>
+
+      {recentHistory.length > 0 && (
+        <div className="space-y-4 bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold">Recent Generations</h2>
+            <Button variant="link" asChild>
+              <Link to="/history">View All</Link>
+            </Button>
+          </div>
+          <div className="space-y-4">
+            {recentHistory.map((item) => {
+              const formatted = formatContent(item.content);
+              const firstLine = getFirstLine(formatted);
+              return (
+                <Card key={item.id} className="shadow-none border border-gray-100">
+                  <CardHeader className="pb-1 pt-3 px-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <div className={cn(
+                          "flex h-5 w-5 items-center justify-center rounded-full text-xs",
+                          item.platform === "linkedin" ? "bg-blue-100" : "bg-red-100"
+                        )}>
+                          <PlatformIcon platform={item.platform} />
+                        </div>
+                        <CardTitle className="text-sm font-medium">{item.topic}</CardTitle>
+                      </div>
+                      <CardDescription className="text-xs">
+                        {format(new Date(item.createdAt), "MMM d, HH:mm")}
+                      </CardDescription>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="px-4 pb-3">
+                    <p className="text-sm text-muted-foreground truncate">
+                      {firstLine || "(No content preview available)"}
+                    </p>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

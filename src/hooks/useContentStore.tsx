@@ -1,4 +1,3 @@
-
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
@@ -8,7 +7,7 @@ export interface ContentItem {
   id: string;
   platform: Platform;
   topic: string;
-  content: string;
+  content: any;
   createdAt: string;
   isPinned?: boolean;
 }
@@ -23,6 +22,7 @@ interface ContentStore {
   addToHistory: (item: ContentItem) => void;
   removeFromHistory: (id: string) => void;
   togglePinContent: (id: string) => void;
+  updateHistoryItem: (item: ContentItem) => void;
   addToCalendar: (item: CalendarItem) => void;
   removeFromCalendar: (id: string) => void;
   updateCalendarItem: (item: CalendarItem) => void;
@@ -47,6 +47,12 @@ export const useContentStore = create<ContentStore>()(
       togglePinContent: (id) => set((state) => ({
         contentHistory: state.contentHistory.map(item => 
           item.id === id ? { ...item, isPinned: !item.isPinned } : item
+        )
+      })),
+      
+      updateHistoryItem: (updatedItem) => set((state) => ({
+        contentHistory: state.contentHistory.map(item => 
+          item.id === updatedItem.id ? updatedItem : item
         )
       })),
       
