@@ -1,6 +1,7 @@
 
 import React, { useState } from "react";
 import { v4 as uuidv4 } from 'uuid';
+import { format } from "date-fns";
 import { useContentStore, Platform, ContentItem, CalendarItem } from "@/hooks/useContentStore";
 import { useToast } from "@/hooks/use-toast";
 import { PlatformSection } from "./generator/PlatformSection";
@@ -136,10 +137,6 @@ export function ContentGenerator() {
   };
   
   const scheduledItems = getScheduledItemsForSelectedDate();
-
-  // Import format here to avoid duplicate imports in the component
-  // This is needed for the handleSchedule function
-  import { format } from "date-fns";
 
   return (
     <div className="space-y-8 animate-fade-in">
