@@ -6,11 +6,13 @@ import { Input } from "@/components/ui/input";
 import { PlatformSelector } from "@/components/platforms/PlatformSelector";
 import { Platform, useContentStore, ContentItem } from "@/hooks/useContentStore";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Copy, Calendar } from "lucide-react";
+import { Loader2, Copy, Calendar, Webhook } from "lucide-react";
 import { v4 as uuidv4 } from 'uuid';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { format } from "date-fns";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 // Simulated AI response function for the MVP (to be replaced with real API)
 const generateAIContent = async (platform: Platform, topic: string): Promise<string> => {
@@ -24,6 +26,9 @@ const generateAIContent = async (platform: Platform, topic: string): Promise<str
   }
 };
 
+// Webhook URL for content generation
+const WEBHOOK_URL = "https://pcspace.app.n8n.cloud/webhook-test/53249fb9-c8da-4654-b979-32db120266fe";
+
 export function ContentGenerator() {
   const [platform, setPlatform] = useState<Platform | null>(null);
   const [topic, setTopic] = useState<string>("");
@@ -31,6 +36,8 @@ export function ContentGenerator() {
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [isCalendarOpen, setIsCalendarOpen] = useState<boolean>(false);
+  const [useWebhook, setUseWebhook] = useState<boolean>(true);
+  const [webhookResponse, setWebhookResponse] = useState<any>(null);
   
   const { toast } = useToast();
   const addToHistory = useContentStore(state => state.addToHistory);
@@ -57,7 +64,33 @@ export function ContentGenerator() {
     
     try {
       setIsGenerating(true);
-      const content = await generateAIContent(platform, topic);
+      let content = "";
+      
+      if (useWebhook) {
+        // Use webhook for content generation
+        const response = await fetch(WEBHOOK_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            platform,
+            topic,
+            timestamp: new Date().toISOString()
+          }),
+        });
+        
+        const data = await response.json();
+        setWebhookResponse(data);
+        
+        // Extract content from webhook response
+        content = data.content || data.message || 
+                 (typeof data === 'string' ? data : JSON.stringify(data));
+      } else {
+        // Use simulated content generation
+        content = await generateAIContent(platform, topic);
+      }
+      
       setGeneratedContent(content);
       
       // Add to history
@@ -73,12 +106,13 @@ export function ContentGenerator() {
       
       toast({
         title: "Content Created",
-        description: "Your content has been successfully generated.",
+        description: useWebhook ? "Content received from webhook" : "Your content has been successfully generated.",
       });
     } catch (error) {
+      console.error("Error generating content:", error);
       toast({
         title: "Generation Failed",
-        description: "There was an error generating your content. Please try again.",
+        description: `There was an error: ${error instanceof Error ? error.message : "Unknown error"}`,
         variant: "destructive",
       });
     } finally {
@@ -124,7 +158,20 @@ export function ContentGenerator() {
 
   return (
     <div className="space-y-8 animate-fade-in">
-      <PlatformSelector selectedPlatform={platform} onSelectPlatform={setPlatform} />
+      <div className="flex flex-col space-y-4">
+        <PlatformSelector selectedPlatform={platform} onSelectPlatform={setPlatform} />
+        
+        <div className="flex items-center space-x-2">
+          <Switch
+            id="webhook-mode"
+            checked={useWebhook}
+            onCheckedChange={setUseWebhook}
+          />
+          <Label htmlFor="webhook-mode" className="text-sm font-medium">
+            Use webhook for content generation
+          </Label>
+        </div>
+      </div>
       
       <div className="space-y-4">
         <h2 className="text-lg font-semibold">Topic</h2>
@@ -145,7 +192,10 @@ export function ContentGenerator() {
                 Generating
               </>
             ) : (
-              "Generate Content"
+              <>
+                {useWebhook ? <Webhook className="mr-2 h-4 w-4" /> : null}
+                Generate Content
+              </>
             )}
           </Button>
         </div>
@@ -184,7 +234,7 @@ export function ContentGenerator() {
                       mode="single"
                       selected={selectedDate}
                       onSelect={setSelectedDate}
-                      className="rounded-md border"
+                      className="rounded-md border pointer-events-auto"
                       disabled={(date) => date < new Date()}
                     />
                   </div>
@@ -205,6 +255,15 @@ export function ContentGenerator() {
               className="min-h-[300px] p-4"
             />
           </div>
+          
+          {useWebhook && webhookResponse && (
+            <div className="mt-4 p-4 bg-muted rounded-md">
+              <h3 className="text-sm font-medium mb-2">Webhook Response</h3>
+              <pre className="text-xs overflow-auto max-h-[150px]">
+                {JSON.stringify(webhookResponse, null, 2)}
+              </pre>
+            </div>
+          )}
         </div>
       )}
     </div>
