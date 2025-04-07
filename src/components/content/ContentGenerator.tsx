@@ -19,7 +19,7 @@ import {
   CardHeader, 
   CardTitle 
 } from "@/components/ui/card";
-import { PlatformIcon } from "@/lib/formatUtils.tsx";
+import { PlatformIcon } from "@/lib/icons";
 import { formatContent, getFirstLine } from "@/lib/formatUtils";
 import { Link } from "react-router-dom";
 

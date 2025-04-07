@@ -79,4 +79,4 @@ export const getFirstLine = (text: string): string => {
   }
   
   return ''; // Return empty if no content lines found
-}; 
+};

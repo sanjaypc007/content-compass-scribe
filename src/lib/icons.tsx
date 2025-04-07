@@ -9,6 +9,3 @@ export const PlatformIcon: React.FC<{ platform: string }> = ({ platform }) => {
     <MessageSquare className="h-4 w-4" />
   );
 };
-
-// Re-export the utility functions from the .ts file for convenience
-export { formatContent, getFirstLine } from './formatUtils';

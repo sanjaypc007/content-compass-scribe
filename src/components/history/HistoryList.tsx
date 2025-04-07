@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { format } from "date-fns";
 import { 
@@ -17,7 +18,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "../ui/EmptyState";
-import { PlatformIcon } from "@/lib/formatUtils.tsx";
+import { PlatformIcon } from "@/lib/icons";
 import { formatContent, getFirstLine } from "@/lib/formatUtils";
 
 export function HistoryList() {
