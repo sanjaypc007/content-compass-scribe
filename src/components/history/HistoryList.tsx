@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { format } from "date-fns";
 import { 
@@ -18,7 +17,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "../ui/EmptyState";
-import { PlatformIcon, formatContent, getFirstLine } from "@/lib/formatUtils";
+import { PlatformIcon } from "@/lib/formatUtils.tsx";
+import { formatContent, getFirstLine } from "@/lib/formatUtils";
 
 export function HistoryList() {
   const { contentHistory, removeFromHistory, togglePinContent, addToCalendar, updateHistoryItem } = useContentStore();
@@ -65,7 +65,6 @@ export function HistoryList() {
 
   const handleStartEdit = (item: ContentItem) => {
     setEditingId(item.id);
-    // Get formatted content for editing
     setEditedContent(formatContent(item.content)); 
   };
 
@@ -111,9 +110,7 @@ export function HistoryList() {
   return (
     <div className="space-y-6 animate-fade-in">
       {sortedHistory.map((item) => {
-        // Format the content as plain text
         const fullFormattedContent = formatContent(item.content);
-        // Get the first line for preview
         const firstLine = getFirstLine(fullFormattedContent);
         
         return (

@@ -19,7 +19,8 @@ import {
   CardHeader, 
   CardTitle 
 } from "@/components/ui/card";
-import { PlatformIcon, formatContent, getFirstLine } from "@/lib/formatUtils";
+import { PlatformIcon } from "@/lib/formatUtils.tsx";
+import { formatContent, getFirstLine } from "@/lib/formatUtils";
 import { Link } from "react-router-dom";
 
 export function ContentGenerator() {
