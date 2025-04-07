@@ -1,8 +1,14 @@
+
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Edit, Calendar, Trash2 } from "lucide-react";
+import { Edit, Calendar, Trash2, Save } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { useContentStore } from "@/hooks/useContentStore";
+import { v4 as uuidv4 } from 'uuid';
+import { format } from "date-fns";
 
 interface ContentEditorProps {
   content: string;
@@ -21,6 +27,9 @@ export function ContentEditor({
 }: ContentEditorProps) {
   const { toast } = useToast();
   const [isEditing, setIsEditing] = React.useState(false);
+  const [isCalendarOpen, setIsCalendarOpen] = React.useState(false);
+  const [selectedDate, setSelectedDate] = React.useState<Date | undefined>(undefined);
+  const { addToCalendar } = useContentStore();
   
   const handleEdit = () => {
     setIsEditing(!isEditing);
@@ -33,9 +42,35 @@ export function ContentEditor({
   };
 
   const handleAddToCalendar = () => {
+    setIsCalendarOpen(true);
+  };
+
+  const handleCalendarSubmit = () => {
+    if (!selectedDate) {
+      toast({
+        title: "Date Required",
+        description: "Please select a date for scheduling.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const calendarItem = {
+      id: uuidv4(),
+      platform: webhookResponse?.platform || "linkedin",
+      topic: webhookResponse?.topic || "Untitled Content",
+      content: displayContent,
+      createdAt: new Date().toISOString(),
+      scheduledDate: selectedDate.toISOString()
+    };
+
+    addToCalendar(calendarItem);
+    setIsCalendarOpen(false);
+    setSelectedDate(undefined);
+
     toast({
-      title: "Add to Calendar",
-      description: "Content has been added to your calendar.",
+      title: "Added to Calendar",
+      description: `Content scheduled for ${format(selectedDate, "PPP")}`,
     });
   };
 
@@ -45,18 +80,16 @@ export function ContentEditor({
     }
   };
 
-  const formatWebhookContent = (response: any) => {
+  const formatWebhookContent = (response: any): string => {
     try {
-      console.log('Webhook Response:', response); // Debug log
-
       if (!response) return 'No content available';
 
-      // If response is a string, format it directly
+      // If response is a string, return it directly
       if (typeof response === 'string') {
         return response;
       }
       
-      // If response is an array (like the LinkedIn example)
+      // If response is an array
       if (Array.isArray(response)) {
         const item = response[0];
         if (!item) return 'No content available';
@@ -64,67 +97,130 @@ export function ContentEditor({
         // If item is a string
         if (typeof item === 'string') return item;
 
-        // Check if item has the structured content directly (hook, body, etc.)
+        // If item has structured content
         if (item.hook || item.body || item.cta || item.hashtags) {
-          // Handle comma-separated hashtags string
-          let hashtagsArray = item.hashtags;
-          if (typeof hashtagsArray === 'string') {
-            hashtagsArray = hashtagsArray.split(',').map(tag => tag.trim());
+          let content = '';
+          if (item.hook) content += item.hook + '\n\n';
+          if (item.body) content += item.body + '\n\n';
+          if (item.cta) content += item.cta + '\n\n';
+          
+          if (item.hashtags) {
+            let hashtags = item.hashtags;
+            if (typeof hashtags === 'string') {
+              content += hashtags;
+            } else if (Array.isArray(hashtags)) {
+              content += hashtags.map((tag: string) => `#${tag.replace(/^#/, '')}`).join(' ');
+            }
           }
-          return formatContentSections(item.hook, item.body, item.cta, hashtagsArray);
+          
+          return content.trim();
         }
 
         // If item has nested content
         if (item.content) {
           if (typeof item.content === 'string') return item.content;
           if (typeof item.content === 'object') {
+            let content = '';
             const { hook, body, cta, hashtags } = item.content;
-            return formatContentSections(hook, body, cta, hashtags);
+            
+            if (hook) content += hook + '\n\n';
+            if (body) content += body + '\n\n';
+            if (cta) content += cta + '\n\n';
+            
+            if (hashtags) {
+              if (typeof hashtags === 'string') {
+                content += hashtags;
+              } else if (Array.isArray(hashtags)) {
+                content += hashtags.map((tag: string) => `#${tag.replace(/^#/, '')}`).join(' ');
+              }
+            }
+            
+            return content.trim();
           }
         }
         
-        return 'Unable to format array item content';
+        return JSON.stringify(item, null, 2);
       }
       
-      // Handle direct object response (e.g., output structure)
+      // Handle direct object response
       if (typeof response === 'object') {
-        // Handle LinkedIn specific response format (check added for direct object too)
+        // LinkedIn specific response
         if (response.platform === 'linkedin' && response.content) {
           if (typeof response.content === 'string') return response.content;
           if (typeof response.content === 'object') {
+            let content = '';
             const { hook, body, cta, hashtags } = response.content;
-             // Handle comma-separated hashtags string
-            let hashtagsArray = hashtags;
-            if (typeof hashtagsArray === 'string') {
-              hashtagsArray = hashtagsArray.split(',').map(tag => tag.trim());
+            
+            if (hook) content += hook + '\n\n';
+            if (body) content += body + '\n\n';
+            if (cta) content += cta + '\n\n';
+            
+            if (hashtags) {
+              if (typeof hashtags === 'string') {
+                content += hashtags;
+              } else if (Array.isArray(hashtags)) {
+                content += hashtags.map((tag: string) => `#${tag.replace(/^#/, '')}`).join(' ');
+              }
             }
-            return formatContentSections(hook, body, cta, hashtagsArray);
+            
+            return content.trim();
           }
         }
         
-        // If response has output structure
+        // Output structure
         if (response.output?.content) {
+          let content = '';
           const { hook, body, cta, hashtags } = response.output.content;
-          return formatContentSections(hook, body, cta, hashtags);
+          
+          if (hook) content += hook + '\n\n';
+          if (body) content += body + '\n\n';
+          if (cta) content += cta + '\n\n';
+          
+          if (hashtags) {
+            if (typeof hashtags === 'string') {
+              content += hashtags;
+            } else if (Array.isArray(hashtags)) {
+              content += hashtags.map((tag: string) => `#${tag.replace(/^#/, '')}`).join(' ');
+            }
+          }
+          
+          return content.trim();
         }
 
-        // If response has direct content field
+        // Direct content field
         if (response.content) {
           if (typeof response.content === 'string') return response.content;
           if (typeof response.content === 'object') {
+            let content = '';
             const { hook, body, cta, hashtags } = response.content;
-            return formatContentSections(hook, body, cta, hashtags);
+            
+            if (hook) content += hook + '\n\n';
+            if (body) content += body + '\n\n';
+            if (cta) content += cta + '\n\n';
+            
+            if (hashtags) {
+              if (typeof hashtags === 'string') {
+                content += hashtags;
+              } else if (Array.isArray(hashtags)) {
+                content += hashtags.map((tag: string) => `#${tag.replace(/^#/, '')}`).join(' ');
+              }
+            }
+            
+            return content.trim();
           }
         }
         
-        // If response has message field
+        // Message field
         if (response.message) return response.message;
         
-        // Try to extract content from common fields
-        const extractedContent = extractContentFromObject(response);
-        if (extractedContent) return extractedContent;
+        // Extract content from common fields
+        for (const field of ['text', 'body', 'message', 'response']) {
+          if (response[field] && typeof response[field] === 'string') {
+            return response[field];
+          }
+        }
         
-        // Fallback to JSON stringify
+        // Fallback
         return JSON.stringify(response, null, 2);
       }
       
@@ -136,50 +232,7 @@ export function ContentEditor({
     }
   };
 
-  const formatContentSections = (hook?: string, body?: string, cta?: string, hashtags?: string[] | string) => {
-    const sections = [];
-
-    if (hook) sections.push(`🎯 Hook:\n${hook}`);
-    if (body) sections.push(`📝 Content:\n${body}`);
-    if (cta) sections.push(`💡 Call to Action:\n${cta}`);
-    
-    let formattedHashtags = '';
-    if (Array.isArray(hashtags) && hashtags.length > 0) {
-      formattedHashtags = hashtags.map(tag => `#${tag.replace(/^#/, '')}`).join(' ');
-    } else if (typeof hashtags === 'string' && hashtags.trim()) {
-      // Handle case where hashtags might be a single string already
-      formattedHashtags = hashtags.split(',').map(tag => `#${tag.trim().replace(/^#/, '')}`).join(' ');
-    }
-    
-    if (formattedHashtags) {
-      sections.push(`#️⃣ Tags:\n${formattedHashtags}`);
-    }
-
-    return sections.join('\n\n');
-  };
-
-  const extractContentFromObject = (obj: any): string | null => {
-    const contentFields = ['content', 'body', 'text', 'message'];
-    for (const field of contentFields) {
-      if (obj[field]) {
-        if (typeof obj[field] === 'string') return obj[field];
-        if (typeof obj[field] === 'object') {
-          const formatted = formatContentSections(
-            obj[field].hook,
-            obj[field].body,
-            obj[field].cta,
-            obj[field].hashtags
-          );
-          if (formatted) return formatted;
-        }
-      }
-    }
-    return null;
-  };
-
   const displayContent = useWebhook ? formatWebhookContent(webhookResponse) : content || 'No content available';
-
-  console.log('Display Content:', displayContent); // Debug log
 
   return (
     <div className="mt-2 bg-white border border-gray-200 rounded-lg shadow-sm">
@@ -191,8 +244,17 @@ export function ContentEditor({
             onClick={handleEdit}
             className={`${isEditing ? 'bg-blue-50 text-blue-600' : 'hover:bg-blue-50'}`}
           >
-            <Edit className="mr-2 h-4 w-4" />
-            {isEditing ? 'Save' : 'Edit'}
+            {isEditing ? (
+              <>
+                <Save className="mr-2 h-4 w-4" />
+                Save
+              </>
+            ) : (
+              <>
+                <Edit className="mr-2 h-4 w-4" />
+                Edit
+              </>
+            )}
           </Button>
           <Button 
             variant="outline" 
@@ -232,6 +294,28 @@ export function ContentEditor({
           }}
         />
       </div>
+
+      <Dialog open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Schedule Content</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <CalendarComponent
+              mode="single"
+              selected={selectedDate}
+              onSelect={setSelectedDate}
+              className="rounded-md border"
+              disabled={(date) => date < new Date()}
+            />
+          </div>
+          <div className="flex justify-end">
+            <Button onClick={handleCalendarSubmit}>
+              Add to Calendar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

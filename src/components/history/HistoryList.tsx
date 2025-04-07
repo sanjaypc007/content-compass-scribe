@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { format } from "date-fns";
 import { 
@@ -12,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { ContentItem, useContentStore } from "@/hooks/useContentStore";
-import { Calendar, Copy, Star, Trash, Edit, Save } from "lucide-react";
+import { Calendar, Copy, Star, Trash2, Edit, Save } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
@@ -64,13 +65,11 @@ export function HistoryList() {
 
   const handleStartEdit = (item: ContentItem) => {
     setEditingId(item.id);
-    // Ensure we are editing the *full* formatted content
+    // Get formatted content for editing
     setEditedContent(formatContent(item.content)); 
   };
 
   const handleSaveEdit = (item: ContentItem) => {
-    // Here, editedContent contains the full text from the Textarea
-    // We need to update the item in the store with this full content
     const updatedItem = { ...item, content: editedContent }; 
     updateHistoryItem(updatedItem);
     toast({
@@ -82,11 +81,10 @@ export function HistoryList() {
   
   const handleAddToCalendar = () => {
     if (selectedItem && selectedDate) {
-      // Pass the *original* or potentially *edited full* content to the calendar
       const contentToSchedule = editingId === selectedItem.id ? editedContent : formatContent(selectedItem.content);
       addToCalendar({
         ...selectedItem,
-        content: contentToSchedule, // Ensure full content goes to calendar
+        content: contentToSchedule,
         scheduledDate: selectedDate.toISOString(),
       });
       setIsCalendarOpen(false);
@@ -113,11 +111,11 @@ export function HistoryList() {
   return (
     <div className="space-y-6 animate-fade-in">
       {sortedHistory.map((item) => {
-        // Format the full content once
+        // Format the content as plain text
         const fullFormattedContent = formatContent(item.content);
-        // Get the first line for display
+        // Get the first line for preview
         const firstLine = getFirstLine(fullFormattedContent);
-
+        
         return (
           <Card 
             key={item.id} 
@@ -142,10 +140,10 @@ export function HistoryList() {
                 </CardDescription>
               </div>
             </CardHeader>
-            <CardContent className="pt-0 pb-2"> {/* Adjust padding */} 
+            <CardContent className="pt-2 pb-2">
               {editingId === item.id ? (
                 <Textarea
-                  value={editedContent} // Edit the full content
+                  value={editedContent}
                   onChange={(e) => setEditedContent(e.target.value)}
                   className="w-full min-h-[200px] p-4 text-sm leading-relaxed whitespace-pre-wrap rounded-md border-gray-200"
                   style={{
@@ -156,12 +154,22 @@ export function HistoryList() {
                   }}
                 />
               ) : (
-                <p className="text-sm text-muted-foreground truncate">
-                  {firstLine || "(No content preview available)"} {/* Display first line */} 
-                </p>
+                <>
+                  <p className="text-sm mb-1">
+                    {firstLine || "(No content preview available)"}
+                  </p>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="text-xs text-muted-foreground p-0 h-auto"
+                    onClick={() => handleStartEdit(item)}
+                  >
+                    View full content
+                  </Button>
+                </>
               )}
             </CardContent>
-            <CardFooter className="flex justify-between pt-2"> {/* Adjust padding */} 
+            <CardFooter className="flex justify-between pt-2">
               <div className="flex space-x-1">
                 <Button 
                   variant="ghost" 
@@ -169,7 +177,7 @@ export function HistoryList() {
                   onClick={() => handleTogglePin(item.id)}
                   title={item.isPinned ? "Unpin" : "Pin"}
                   className={cn(
-                    "p-2 h-auto", // Compact button
+                    "p-2 h-auto",
                     item.isPinned && "text-yellow-500"
                   )}
                 >
@@ -180,9 +188,9 @@ export function HistoryList() {
                   size="sm" 
                   onClick={() => handleDelete(item.id)}
                   title="Delete"
-                  className="text-destructive p-2 h-auto" // Compact button
+                  className="text-destructive p-2 h-auto"
                 >
-                  <Trash className="h-4 w-4" />
+                  <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
               <div className="flex space-x-1">
@@ -192,7 +200,7 @@ export function HistoryList() {
                   onClick={() => editingId === item.id ? handleSaveEdit(item) : handleStartEdit(item)}
                   title={editingId === item.id ? "Save Changes" : "Edit Content"}
                   className={cn(
-                    "p-2 h-auto", // Compact button
+                    "p-2 h-auto",
                     editingId === item.id ? "text-green-600" : ""
                   )}
                 >
@@ -205,9 +213,9 @@ export function HistoryList() {
                 <Button 
                   variant="ghost" 
                   size="sm" 
-                  onClick={() => handleCopy(fullFormattedContent)} // Copy the full formatted content
+                  onClick={() => handleCopy(fullFormattedContent)}
                   title="Copy Content"
-                  className="p-2 h-auto" // Compact button
+                  className="p-2 h-auto"
                 >
                   <Copy className="h-4 w-4" />
                 </Button>
@@ -216,7 +224,7 @@ export function HistoryList() {
                   size="sm" 
                   onClick={() => handleSchedule(item)}
                   title="Schedule Content"
-                  className="p-2 h-auto" // Compact button
+                  className="p-2 h-auto"
                 >
                   <Calendar className="h-4 w-4" />
                 </Button>
